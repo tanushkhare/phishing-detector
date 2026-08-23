@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Phishing URL & Threat Detector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo">⚡ AI Phishing URL & Threat Detector</div>
+      <div class="badge">Live Microservice Active</div>
+    </div>
+  </header>
+
+  <main class="main-layout">
+    <!-- Left Column: URL Ingestion -->
+    <section class="panel-left">
+      <h2>Target URL Ingestion & Heuristics</h2>
+      <p class="subtitle">Deep lexical parsing evaluating subdomain entropy, deceptive keywords, IP hosting, and SSL certificate validity.</p>
+
+      <div class="input-group">
+        <label for="urlInput">Target URL / Domain Endpoint</label>
+        <input type="text" id="urlInput" class="text-input" value="http://192.168.1.105/secure-login-account-verify.xyz">
+      </div>
+
+      <button class="btn primary-btn" onclick="executeProcess()">Execute Phishing Analysis Pipeline</button>
+
+      <div class="log-card">
+        <h4>Heuristic Engine Telemetry</h4>
+        <div id="logBox" class="terminal-log">Threat detector ready. Standing by for URL payload...</div>
+      </div>
+    </section>
+
+    <!-- Right Column: Diagnostics & Verdict -->
+    <aside class="panel-right">
+      <h2>Pipeline Diagnostics</h2>
+
+      <div class="metric-row">
+        <div class="metric-card">
+          <span class="label">Threat Score</span>
+          <span class="value" id="val1">--</span>
+        </div>
+        <div class="metric-card">
+          <span class="label">Classification</span>
+          <span class="value" id="val2" style="font-size: 1.05rem; padding-top: 0.4rem;">--</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Risk Indicators & Signals</h3>
+        <ul id="resList">
+          <li>Submit a URL to analyze heuristic risk vectors.</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    async function executeProcess() {
+      const url = document.getElementById('urlInput').value.trim();
+      const log = document.getElementById('logBox');
+
+      if (!url) {
+        alert("Please enter a URL to analyze.");
+        return;
+      }
+
+      log.innerText = `[${new Date().toLocaleTimeString()}] Pipeline triggered.\n[${new Date().toLocaleTimeString()}] Ingesting target: ${url}\n[${new Date().toLocaleTimeString()}] Querying endpoint: /api/v1/phishing/scan...`;
+
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/phishing/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url })
+        });
+
+        if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+
+        const data = await res.json();
+        
+        document.getElementById('val1').innerText = data.threat_score;
+        document.getElementById('val1').style.color = data.is_phishing ? "#f87171" : "#34d399";
+
+        document.getElementById('val2').innerText = data.status_label;
+        document.getElementById('val2').style.color = data.is_phishing ? "#f87171" : "#34d399";
+
+        let analysisHtml = `
+          <li>Shannon Lexical Entropy: <code>${data.entropy_score}</code></li>
+          <li>SSL Encryption Valid: <code>${data.ssl_valid ? 'YES (HTTPS)' : 'NO (HTTP)'}</code></li>
+        `;
+
+        data.risk_indicators.forEach(indicator => {
+          analysisHtml += `<li><span style="color:${data.is_phishing ? '#f87171' : '#34d399'}; font-weight:600;">•</span> ${indicator}</li>`;
+        });
+
+        document.getElementById('resList').innerHTML = analysisHtml;
+        log.innerText += `\n[${new Date().toLocaleTimeString()}] 200 OK: Execution complete. Threat score computed.`;
+      } catch (err) {
+        log.innerText += `\n[${new Date().toLocaleTimeString()}] Note: Backend offline (${err.message}).`;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,9 +1,9 @@
-from fastapi import APIRouter
-from app.schemas.phishing import URLCheckRequest, URLCheckResponse
-from app.services.phishing_service import classify_url
+﻿from fastapi import APIRouter
+from backend.app.schemas.phishing import URLScanRequest, URLScanResponse
+from backend.app.services.phishing_service import phishing_service
 
-router = APIRouter(prefix="/api", tags=["Phishing Detector"])
+router = APIRouter(prefix="/api/v1/phishing", tags=["Phishing & Threat Engine"])
 
-@router.post("/scan-url", response_model=URLCheckResponse)
-def scan_url(payload: URLCheckRequest):
-    return classify_url(payload.url)
+@router.post("/scan", response_model=URLScanResponse)
+async def scan_url(payload: URLScanRequest):
+    return phishing_service.scan_url(payload)
