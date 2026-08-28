@@ -1,70 +1,72 @@
 ﻿import math
 import re
-from backend.app.schemas.phishing import URLScanRequest, URLScanResponse
+from datetime import datetime, timezone
+from typing import Dict, Any, List
 
-class PhishingDetectorEngine:
-    @staticmethod
-    def _calculate_entropy(text: str) -> float:
-        if not text:
+class PhishingDetectionEngine:
+    def __init__(self):
+        self.suspicious_tlds = [".xyz", ".top", ".club", ".work", ".click", ".gq", ".tk", ".cf", ".ml"]
+        self.sensitive_keywords = ["login", "verify", "secure", "banking", "update", "account", "wallet", "signin", "auth", "paypal"]
+
+    def _calculate_entropy(self, s: str) -> float:
+        if not s:
             return 0.0
-        prob = [float(text.count(c)) / len(text) for c in dict.fromkeys(list(text))]
-        entropy = - sum([p * math.log2(p) for p in prob])
-        return round(entropy, 2)
+        prob = [float(s.count(c)) / len(s) for c in set(s)]
+        return round(-sum(p * math.log2(p) for p in prob), 3)
 
-    @staticmethod
-    def scan_url(payload: URLScanRequest) -> URLScanResponse:
-        raw_url = payload.url.strip()
-        url_lower = raw_url.lower()
-        
-        indicators = []
+    def evaluate_url(self, target_url: str) -> Dict[str, Any]:
+        url_lower = target_url.lower()
         threat_score = 0.05
-        
-        # 1. IP address in hostname
-        ip_pattern = r"^(http|https)://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-        if re.search(ip_pattern, url_lower):
-            threat_score += 0.45
-            indicators.append("Direct IP address used instead of domain name")
+        flags: List[str] = []
 
-        # 2. Suspicious TLDs
-        suspicious_tlds = [".xyz", ".top", ".buzz", ".tk", ".cf", ".ga", ".ml", ".gq"]
-        if any(url_lower.endswith(tld) or (tld + "/") in url_lower for tld in suspicious_tlds):
-            threat_score += 0.35
-            indicators.append("High-risk domain Top-Level Domain (TLD) flagged")
+        # 1. IP address in domain
+        if re.search(r"https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", url_lower):
+            threat_score += 0.40
+            flags.append("Raw IP address used in host domain")
 
-        # 3. Phishing keywords
-        keywords = ["secure-login", "account-verify", "bank-update", "signin-support", "wallet-connect", "paypal-auth", "billing-alert"]
-        for kw in keywords:
-            if kw in url_lower:
-                threat_score += 0.30
-                indicators.append(f"Deceptive credential harvest cue: '{kw}'")
+        # 2. Suspicious TLD check
+        for tld in self.suspicious_tlds:
+            if tld in url_lower:
+                threat_score += 0.25
+                flags.append(f"High-risk top-level domain ({tld})")
+                break
 
-        # 4. Entropy calculation
-        entropy = PhishingDetectorEngine._calculate_entropy(raw_url)
-        if entropy > 4.2:
+        # 3. Excessive subdomains or hyphenation
+        subdomains = url_lower.split("/")[2].split(".") if "//" in url_lower else url_lower.split(".")
+        if len(subdomains) >= 4:
             threat_score += 0.20
-            indicators.append(f"High lexical randomness / character entropy ({entropy})")
-
-        # 5. SSL Check simulation
-        ssl_valid = url_lower.startswith("https://")
-        if not ssl_valid:
+            flags.append(f"Excessive subdomain depth ({len(subdomains)} levels)")
+        if url_lower.count("-") >= 3:
             threat_score += 0.15
-            indicators.append("Insecure transmission protocol (Plain HTTP / No SSL)")
+            flags.append(f"Excessive hyphenation ({url_lower.count('-')} hyphens)")
 
-        threat_score = round(min(max(threat_score, 0.0), 1.0), 2)
-        is_phishing = threat_score >= 0.55
-        status = "CRITICAL / PHISHING THREAT" if is_phishing else "SAFE / LEGITIMATE URL"
+        # 4. Sensitive credential keyword matching
+        kw_hits = [kw for kw in self.sensitive_keywords if kw in url_lower]
+        if kw_hits:
+            threat_score += min(0.35, len(kw_hits) * 0.15)
+            flags.append(f"Credential targeting keywords detected: {', '.join(kw_hits)}")
 
-        if not indicators:
-            indicators.append("Verified domain syntax with healthy trust metrics")
+        entropy = self._calculate_entropy(target_url)
+        if entropy > 4.2:
+            threat_score += 0.15
+            flags.append(f"High Shannon entropy ({entropy}) indicating obfuscation")
 
-        return URLScanResponse(
-            url=raw_url,
-            is_phishing=is_phishing,
-            threat_score=threat_score,
-            status_label=status,
-            entropy_score=entropy,
-            ssl_valid=ssl_valid,
-            risk_indicators=indicators
-        )
+        threat_score = round(min(0.99, max(0.01, threat_score)), 3)
+        is_phishing = threat_score >= 0.50
 
-phishing_service = PhishingDetectorEngine()
+        if not flags:
+            flags.append("Domain follows standard lexical patterns")
+
+        verdict = "MALICIOUS_PHISHING_URL" if is_phishing else "SAFE_REPUTATION_URL"
+
+        return {
+            "url": target_url,
+            "is_phishing": is_phishing,
+            "threat_score": threat_score,
+            "entropy_score": entropy,
+            "detected_suspicious_patterns": flags,
+            "verdict": verdict,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+phishing_engine = PhishingDetectionEngine()

@@ -1,11 +1,11 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.app.routers.phishing import router as phishing_router
+from backend.app.routers import phishing_router
 import uvicorn
 
 app = FastAPI(
-    title="AI Phishing URL & Threat Detector API",
-    description="Heuristic lexical parsing, entropy evaluation, and credential harvest classification.",
+    title="Phishing Threat Detection & Lexical URL Analyzer API",
+    description="Shannon entropy extraction, domain reputation scoring, and heuristic phishing classification.",
     version="1.0.0"
 )
 
@@ -17,10 +17,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(phishing_router)
+app.include_router(phishing_router.router)
 
 @app.get("/health")
-async def health():
+async def health_check():
     return {"status": "healthy", "service": "phishing-detector"}
 
 if __name__ == "__main__":
